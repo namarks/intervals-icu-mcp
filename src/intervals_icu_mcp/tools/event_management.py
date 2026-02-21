@@ -40,7 +40,7 @@ async def create_event(
         JSON string with created event data
     """
     assert ctx is not None
-    config: ICUConfig = ctx.get_state("config")
+    config: ICUConfig = await ctx.get_state("config")
 
     # Validate category
     valid_categories = ["WORKOUT", "NOTE", "RACE", "GOAL"]
@@ -61,8 +61,9 @@ async def create_event(
 
     try:
         # Build event data
+        # Intervals.icu API requires full ISO-8601 datetime with T00:00:00 suffix
         event_data: dict[str, Any] = {
-            "start_date_local": start_date,
+            "start_date_local": f"{start_date}T00:00:00",
             "name": name,
             "category": category.upper(),
         }
@@ -143,7 +144,7 @@ async def update_event(
         JSON string with updated event data
     """
     assert ctx is not None
-    config: ICUConfig = ctx.get_state("config")
+    config: ICUConfig = await ctx.get_state("config")
 
     # Validate date format if provided
     if start_date:
@@ -164,7 +165,8 @@ async def update_event(
         if description is not None:
             event_data["description"] = description
         if start_date is not None:
-            event_data["start_date_local"] = start_date
+            # Add T00:00:00 suffix for Intervals.icu API
+            event_data["start_date_local"] = f"{start_date}T00:00:00"
         if event_type is not None:
             event_data["type"] = event_type
         if duration_seconds is not None:
@@ -230,7 +232,7 @@ async def delete_event(
         JSON string with deletion confirmation
     """
     assert ctx is not None
-    config: ICUConfig = ctx.get_state("config")
+    config: ICUConfig = await ctx.get_state("config")
 
     try:
         async with ICUClient(config) as client:
@@ -275,7 +277,7 @@ async def bulk_create_events(
         JSON string with created events
     """
     assert ctx is not None
-    config: ICUConfig = ctx.get_state("config")
+    config: ICUConfig = await ctx.get_state("config")
 
     try:
         import json
@@ -322,14 +324,18 @@ async def bulk_create_events(
             # Normalize category to uppercase
             event_data["category"] = event_data["category"].upper()
 
-            # Validate date format
-            try:
-                datetime.strptime(event_data["start_date_local"], "%Y-%m-%d")
-            except ValueError:
-                return ResponseBuilder.build_error_response(
-                    f"Event {i}: Invalid date format. Please use YYYY-MM-DD format.",
-                    error_type="validation_error",
-                )
+            # Validate date format and add T00:00:00 suffix if needed
+            date_str = event_data["start_date_local"]
+            if "T" not in date_str:
+                try:
+                    datetime.strptime(date_str, "%Y-%m-%d")
+                    # Add T00:00:00 suffix for Intervals.icu API
+                    event_data["start_date_local"] = f"{date_str}T00:00:00"
+                except ValueError:
+                    return ResponseBuilder.build_error_response(
+                        f"Event {i}: Invalid date format. Please use YYYY-MM-DD format.",
+                        error_type="validation_error",
+                    )
 
         async with ICUClient(config) as client:
             created_events = await client.bulk_create_events(events_data)
@@ -389,7 +395,7 @@ async def bulk_delete_events(
         JSON string with deletion confirmation
     """
     assert ctx is not None
-    config: ICUConfig = ctx.get_state("config")
+    config: ICUConfig = await ctx.get_state("config")
 
     try:
         import json
@@ -450,7 +456,7 @@ async def duplicate_event(
         JSON string with the duplicated event
     """
     assert ctx is not None
-    config: ICUConfig = ctx.get_state("config")
+    config: ICUConfig = await ctx.get_state("config")
 
     # Validate date format
     try:

@@ -28,7 +28,7 @@ async def get_calendar_events(
         JSON string with calendar events
     """
     assert ctx is not None
-    config: ICUConfig = ctx.get_state("config")
+    config: ICUConfig = await ctx.get_state("config")
 
     try:
         # Calculate date range
@@ -67,7 +67,7 @@ async def get_calendar_events(
                     events_by_date[date] = []
 
                 # Determine relative timing
-                date_obj = datetime.strptime(date, "%Y-%m-%d").date()
+                date_obj = datetime.fromisoformat(date).date()
                 today = datetime.now().date()
 
                 if date_obj == today:
@@ -160,7 +160,7 @@ async def get_upcoming_workouts(
         JSON string with upcoming workouts
     """
     assert ctx is not None
-    config: ICUConfig = ctx.get_state("config")
+    config: ICUConfig = await ctx.get_state("config")
 
     try:
         # Look ahead 30 days to find workouts
@@ -189,7 +189,7 @@ async def get_upcoming_workouts(
 
             workouts_data: list[dict[str, Any]] = []
             for workout in workouts:
-                date_obj = datetime.strptime(workout.start_date_local, "%Y-%m-%d").date()
+                date_obj = datetime.fromisoformat(workout.start_date_local).date()
                 today = datetime.now().date()
 
                 if date_obj == today:
@@ -266,7 +266,7 @@ async def get_event(
         JSON string with event details
     """
     assert ctx is not None
-    config: ICUConfig = ctx.get_state("config")
+    config: ICUConfig = await ctx.get_state("config")
 
     try:
         async with ICUClient(config) as client:
