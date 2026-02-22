@@ -1,6 +1,8 @@
 """Activity-related tools for Intervals.icu MCP server."""
 
+import os
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Annotated, Any
 
 from fastmcp import Context
@@ -8,6 +10,41 @@ from fastmcp import Context
 from ..auth import ICUConfig
 from ..client import ICUAPIError, ICUClient
 from ..response_builder import ResponseBuilder
+
+# Default safe directory for file downloads
+_DOWNLOADS_BASE_DIR = Path.home() / "Downloads"
+
+
+def _validate_output_path(output_path: str) -> Path:
+    """Validate that output_path is within the allowed downloads directory.
+
+    Resolves the path and ensures it does not escape the allowed base directory,
+    preventing path traversal attacks (e.g., "../../etc/cron.d/malicious").
+
+    Args:
+        output_path: User-provided file path string.
+
+    Returns:
+        Resolved Path object within the allowed directory.
+
+    Raises:
+        ValueError: If the resolved path is outside the allowed directory.
+    """
+    resolved = Path(output_path).resolve()
+
+    # Allow paths within the downloads directory
+    if resolved.is_relative_to(_DOWNLOADS_BASE_DIR):
+        return resolved
+
+    # Allow paths within the current working directory
+    cwd = Path.cwd().resolve()
+    if resolved.is_relative_to(cwd):
+        return resolved
+
+    raise ValueError(
+        f"Output path must be within '{_DOWNLOADS_BASE_DIR}' or the current working directory. "
+        f"Resolved path '{resolved}' is not allowed."
+    )
 
 
 async def get_recent_activities(
@@ -461,24 +498,25 @@ async def download_activity_file(
             file_content = await client.download_activity_file(activity_id)
 
             if output_path:
-                # Save to file
-                import os
+                # Validate path before writing
+                try:
+                    safe_path = _validate_output_path(output_path)
+                except ValueError as e:
+                    return ResponseBuilder.build_error_response(
+                        str(e), error_type="validation_error"
+                    )
 
-                os.makedirs(
-                    os.path.dirname(output_path) if os.path.dirname(output_path) else ".",
-                    exist_ok=True,
-                )
-                with open(output_path, "wb") as f:
-                    f.write(file_content)
+                os.makedirs(safe_path.parent, exist_ok=True)
+                safe_path.write_bytes(file_content)
 
                 return ResponseBuilder.build_response(
                     data={
                         "activity_id": activity_id,
-                        "saved_to": output_path,
+                        "saved_to": str(safe_path),
                         "size_bytes": len(file_content),
                     },
                     query_type="download_activity_file",
-                    metadata={"message": f"Activity file saved to {output_path}"},
+                    metadata={"message": f"Activity file saved to {safe_path}"},
                 )
             else:
                 # Return base64 encoded
@@ -529,25 +567,26 @@ async def download_fit_file(
             file_content = await client.download_fit_file(activity_id)
 
             if output_path:
-                # Save to file
-                import os
+                # Validate path before writing
+                try:
+                    safe_path = _validate_output_path(output_path)
+                except ValueError as e:
+                    return ResponseBuilder.build_error_response(
+                        str(e), error_type="validation_error"
+                    )
 
-                os.makedirs(
-                    os.path.dirname(output_path) if os.path.dirname(output_path) else ".",
-                    exist_ok=True,
-                )
-                with open(output_path, "wb") as f:
-                    f.write(file_content)
+                os.makedirs(safe_path.parent, exist_ok=True)
+                safe_path.write_bytes(file_content)
 
                 return ResponseBuilder.build_response(
                     data={
                         "activity_id": activity_id,
                         "format": "FIT",
-                        "saved_to": output_path,
+                        "saved_to": str(safe_path),
                         "size_bytes": len(file_content),
                     },
                     query_type="download_fit_file",
-                    metadata={"message": f"FIT file saved to {output_path}"},
+                    metadata={"message": f"FIT file saved to {safe_path}"},
                 )
             else:
                 # Return base64 encoded
@@ -599,25 +638,26 @@ async def download_gpx_file(
             file_content = await client.download_gpx_file(activity_id)
 
             if output_path:
-                # Save to file
-                import os
+                # Validate path before writing
+                try:
+                    safe_path = _validate_output_path(output_path)
+                except ValueError as e:
+                    return ResponseBuilder.build_error_response(
+                        str(e), error_type="validation_error"
+                    )
 
-                os.makedirs(
-                    os.path.dirname(output_path) if os.path.dirname(output_path) else ".",
-                    exist_ok=True,
-                )
-                with open(output_path, "wb") as f:
-                    f.write(file_content)
+                os.makedirs(safe_path.parent, exist_ok=True)
+                safe_path.write_bytes(file_content)
 
                 return ResponseBuilder.build_response(
                     data={
                         "activity_id": activity_id,
                         "format": "GPX",
-                        "saved_to": output_path,
+                        "saved_to": str(safe_path),
                         "size_bytes": len(file_content),
                     },
                     query_type="download_gpx_file",
-                    metadata={"message": f"GPX file saved to {output_path}"},
+                    metadata={"message": f"GPX file saved to {safe_path}"},
                 )
             else:
                 # Return base64 encoded

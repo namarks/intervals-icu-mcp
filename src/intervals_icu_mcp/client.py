@@ -118,8 +118,10 @@ class ICUClient:
             return response
 
         except httpx.HTTPStatusError as e:
+            # Truncate response body to avoid leaking internal API details
+            body = e.response.text[:200] if e.response.text else ""
             raise ICUAPIError(
-                f"HTTP {e.response.status_code}: {e.response.text}",
+                f"HTTP {e.response.status_code}: {body}",
                 e.response.status_code,
             ) from e
         except httpx.RequestError as e:
